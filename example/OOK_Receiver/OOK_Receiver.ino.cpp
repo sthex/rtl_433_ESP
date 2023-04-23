@@ -3,6 +3,7 @@
 
 */
 
+#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ArduinoLog.h>
 #include <rtl_433_ESP.h>
@@ -19,13 +20,6 @@ rtl_433_ESP rf; // use -1 to disable transmitter
 
 int count = 0;
 
-void rtl_433_Callback(char* message) {
-  DynamicJsonBuffer jsonBuffer2(JSON_MSG_BUFFER);
-  JsonObject& RFrtl_433_ESPdata = jsonBuffer2.parseObject(message);
-  logJson(RFrtl_433_ESPdata);
-  count++;
-}
-
 void logJson(JsonObject& jsondata) {
 #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
   char JSONmessageBuffer[jsondata.measureLength() + 1];
@@ -33,17 +27,24 @@ void logJson(JsonObject& jsondata) {
   char JSONmessageBuffer[JSON_MSG_BUFFER];
 #endif
   jsondata.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
-  #if defined(setBitrate) || defined(setFreqDev) || defined(setRxBW)
-    Log.setShowLevel(false);
+#if defined(setBitrate) || defined(setFreqDev) || defined(setRxBW)
+  Log.setShowLevel(false);
   Log.notice(F("."));
   Log.setShowLevel(true);
-  #else
+#else
   Log.notice(F("Received message : %s" CR), JSONmessageBuffer);
-  #endif
+#endif
+}
+
+void rtl_433_Callback(char* message) {
+  DynamicJsonBuffer jsonBuffer2(JSON_MSG_BUFFER);
+  JsonObject& RFrtl_433_ESPdata = jsonBuffer2.parseObject(message);
+  logJson(RFrtl_433_ESPdata);
+  count++;
 }
 
 void setup() {
-  Serial.begin(921600);
+  Serial.begin(115200);
   delay(1000);
 #ifndef LOG_LEVEL
   LOG_LEVEL_SILENT
@@ -92,7 +93,7 @@ int next = uptime() + 30;
 #      define stepMin 5
 #      define stepMax 250
 #    else
-#  define STEP 5
+#      define STEP    5
 #      define stepMin 58
 #      define stepMax 812
 // #      define STEP    0.01
