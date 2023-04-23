@@ -50,6 +50,7 @@
     DECL(cmr113)                     \
     DECL(companion_wtr001)           \
     DECL(cotech_36_7959)             \
+    DECL(cotech_51_3326)             \
     DECL(current_cost)               \
     DECL(danfoss_CFR)                \
     DECL(digitech_xc0324)            \
@@ -247,7 +248,7 @@
     DECL(x10_sec)                    \
     DECL(yale_hsa)                   \
     /* Add new decoders here. */
-#  define NUMOF_OOK_DEVICES 157
+#  define NUMOF_OOK_DEVICES 158 // was 157
 #  define NUMOF_FSK_DEVICES 80
 /* Add new decoders here. */
 #else
