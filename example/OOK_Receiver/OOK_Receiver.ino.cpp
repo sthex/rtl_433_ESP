@@ -6,7 +6,17 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ArduinoLog.h>
+#include <SSD1306Wire.h>
+#include <Wire.h>
 #include <rtl_433_ESP.h>
+
+#include "espNow.h"
+
+#define OLED_ADDR 0x3c
+#define RST_OLED  16
+#define SDA_OLED  21
+#define SCL_OLED  22
+SSD1306Wire display(OLED_ADDR, OLED_SDA, OLED_SCL);
 
 #ifndef RF_MODULE_FREQUENCY
 #  define RF_MODULE_FREQUENCY 433.92
@@ -19,6 +29,9 @@ char messageBuffer[JSON_MSG_BUFFER];
 rtl_433_ESP rf; // use -1 to disable transmitter
 
 int count = 0;
+static ulong lastmillisCotech;
+String wind_dir[9] = {"N", "NW", "W", "SW", "S", "SE", "E", "NE", "?"};
+String info;
 
 void logJson(JsonObject& jsondata) {
 #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
@@ -36,16 +49,71 @@ void logJson(JsonObject& jsondata) {
 #endif
 }
 
+void AddInfo(String msg) {
+  int index = info.indexOf("\n");
+  if (index > 0) {
+    int num = 0;
+    int i = index;
+    do {
+      num++;
+      i = info.indexOf("\n", i + 1);
+    } while (i >= 0);
+
+    if (num >= 5) // max 5 lines
+      info = info.substring(index + 1);
+  }
+  info += msg + "\n";
+}
+
 void rtl_433_Callback(char* message) {
   DynamicJsonBuffer jsonBuffer2(JSON_MSG_BUFFER);
   JsonObject& RFrtl_433_ESPdata = jsonBuffer2.parseObject(message);
   logJson(RFrtl_433_ESPdata);
   count++;
+
+  if (RFrtl_433_ESPdata["model"] == "Cotech-513326") {
+    if (millis() - lastmillisCotech < 100) return; // SKIP DUAL MESSAGE
+    int index = RFrtl_433_ESPdata["wind_dir_deg"];
+    index /= 45;
+    String msg = (String("Wind: ") + wind_dir[index] + " " + RFrtl_433_ESPdata["wind_max_m_s"].as<String>() + " m/s");
+    AddInfo(msg);
+    // sendEspNow(msg.c_str());
+    sendEspNow_Wind(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"], RFrtl_433_ESPdata["rssi"]);
+    lastmillisCotech = millis();
+  } else if (RFrtl_433_ESPdata["model"] == "TS-FT002") {
+    String msg = (String("Depth cm. = ") + RFrtl_433_ESPdata["depth_cm"].as<String>());
+    AddInfo(msg);
+    // sendEspNow(msg.c_str());
+    sendEspNow_Tank(RFrtl_433_ESPdata["depth_cm"], RFrtl_433_ESPdata["temperature_C"], RFrtl_433_ESPdata["rssi"]);
+  } else
+    AddInfo(String("Model ") + RFrtl_433_ESPdata["model"].as<String>());
+
+  display.clear();
+  display.drawString(0, 1, info);
+  display.display(); // displays content in buffer
 }
 
+void initOLED() {
+  display.init(); // clears screen
+  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_10);
+}
+void showOLEDMessage(String line1, String line2, String line3) {
+  display.drawString(0, 0, line1); //  adds to buffer
+  display.drawString(0, 12, line2);
+  display.drawString(0, 24, line3);
+  display.drawString(0, 36, "line4");
+  display.display(); // displays content in buffer
+}
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
+  setupEspNow();
+
+  initOLED();
+  showOLEDMessage(String("Hei steinar"), String("bla"), String("bla"));
+
 #ifndef LOG_LEVEL
   LOG_LEVEL_SILENT
 #endif

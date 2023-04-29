@@ -78,10 +78,9 @@ static int cotech_51_3326_decode(r_device *decoder, bitbuffer_t *bitbuffer)
     if (bitbuffer->num_rows > 2) {
         return DECODE_ABORT_EARLY;
     }
-        if (bitbuffer->bits_per_row[0] < 77 && bitbuffer->bits_per_row[1] < 77) {
-            return DECODE_ABORT_EARLY;
-        }
-    // bitbuffer_print(bitbuffer);
+    if (bitbuffer->bits_per_row[0] < 77 && bitbuffer->bits_per_row[1] < 77) {
+        return DECODE_ABORT_EARLY;
+    }
 
     for (int i = 0; i < bitbuffer->num_rows; ++i) {
          unsigned pos = bitbuffer_search(bitbuffer, i, 0, preamble, 12);
