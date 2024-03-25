@@ -11,6 +11,7 @@
 #include <rtl_433_ESP.h>
 
 #include "espNow.h"
+#include "wind.h"
 
 #define OLED_ADDR 0x3c
 #define RST_OLED  16
@@ -30,7 +31,8 @@ rtl_433_ESP rf; // use -1 to disable transmitter
 
 int count = 0;
 static ulong lastmillisCotech;
-String wind_dir[9] = {"N", "NW", "W", "SW", "S", "SE", "E", "NE", "?"};
+String wind_dir[9] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "?"};
+// String wind_dir[9] = {"N", "NW", "W", "SW", "S", "SE", "E", "NE", "?"};
 String info;
 
 void logJson(JsonObject& jsondata) {
@@ -72,18 +74,17 @@ void rtl_433_Callback(char* message) {
   count++;
 
   if (RFrtl_433_ESPdata["model"] == "Cotech-513326") {
-    if (millis() - lastmillisCotech < 100) return; // SKIP DUAL MESSAGE
+    ulong timeSinceLast = millis() - lastmillisCotech;
+    if (timeSinceLast < 100) return; // SKIP DUAL MESSAGE
     int index = RFrtl_433_ESPdata["wind_dir_deg"];
     index /= 45;
-    String msg = (String("Wind: ") + wind_dir[index] + " " + RFrtl_433_ESPdata["wind_max_m_s"].as<String>() + " m/s");
+    String msg = (String("Wind: ") + wind_dir[index] + " " + RFrtl_433_ESPdata["wind_max_m_s"].as<String>() + " m/s  dt:" + String((int)(timeSinceLast / 1000.0)) + "s");
     AddInfo(msg);
-    // sendEspNow(msg.c_str());
-    sendEspNow_Wind(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"], RFrtl_433_ESPdata["rssi"]);
+    AddIncoming(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"], RFrtl_433_ESPdata["rssi"]);
     lastmillisCotech = millis();
   } else if (RFrtl_433_ESPdata["model"] == "TS-FT002") {
     String msg = (String("Depth cm. = ") + RFrtl_433_ESPdata["depth_cm"].as<String>());
     AddInfo(msg);
-    // sendEspNow(msg.c_str());
     sendEspNow_Tank(RFrtl_433_ESPdata["depth_cm"], RFrtl_433_ESPdata["temperature_C"], RFrtl_433_ESPdata["rssi"]);
   } else
     AddInfo(String("Model ") + RFrtl_433_ESPdata["model"].as<String>());
@@ -112,7 +113,7 @@ void setup() {
   setupEspNow();
 
   initOLED();
-  showOLEDMessage(String("Hei steinar"), String("bla"), String("bla"));
+  showOLEDMessage(String("Cotech-513326"), String("rtl_433_ESP"), String("OOK_Receiver.cpp"));
 
 #ifndef LOG_LEVEL
   LOG_LEVEL_SILENT
