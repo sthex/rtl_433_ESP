@@ -255,10 +255,12 @@
 /**
  * Subset of devices that I have access to and have tested with
  */
-#  define DEVICES         \
-    DECL(lacrosse_tx141x) \
+#  define DEVICES        \
+    DECL(cotech_51_3326) \
+    DECL(ts_ft002)
+
 /* Add new personal decoders here. */
-#  define NUMOF_OOK_DEVICES 1
+#  define NUMOF_OOK_DEVICES 2
 #  define NUMOF_FSK_DEVICES 0
 #endif
 

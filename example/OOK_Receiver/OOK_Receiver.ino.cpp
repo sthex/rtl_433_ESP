@@ -31,8 +31,7 @@ rtl_433_ESP rf; // use -1 to disable transmitter
 
 int count = 0;
 static ulong lastmillisCotech;
-String wind_dir[9] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "?"};
-// String wind_dir[9] = {"N", "NW", "W", "SW", "S", "SE", "E", "NE", "?"};
+String wind_dir[9] = {"N ", "NE", "E ", "SE", "S ", "SW", "W ", "NW", "?"};
 String info;
 
 void logJson(JsonObject& jsondata) {
