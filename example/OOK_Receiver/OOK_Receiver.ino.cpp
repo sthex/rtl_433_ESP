@@ -10,8 +10,9 @@
 #include <Wire.h>
 #include <rtl_433_ESP.h>
 
-#include "espNow.h"
-#include "wind.h"
+// #include "espNow.h"
+#include "Azure.h"
+// #include "wind.h"
 
 #define OLED_ADDR 0x3c
 #define RST_OLED  16
@@ -47,6 +48,10 @@ void logJson(JsonObject& jsondata) {
   Log.setShowLevel(true);
 #else
   Log.notice(F("Received message : %s" CR), JSONmessageBuffer);
+
+  telemetry_payload = JSONmessageBuffer;
+  send_azure();
+
 #endif
 }
 
@@ -79,12 +84,12 @@ void rtl_433_Callback(char* message) {
     index /= 45;
     String msg = (String("Wind: ") + wind_dir[index] + " " + RFrtl_433_ESPdata["wind_max_m_s"].as<String>() + " m/s  dt:" + String((int)(timeSinceLast / 1000.0)) + "s");
     AddInfo(msg);
-    AddIncoming(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"], RFrtl_433_ESPdata["rssi"]);
+    // AddIncoming(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"], RFrtl_433_ESPdata["rssi"]);
     lastmillisCotech = millis();
   } else if (RFrtl_433_ESPdata["model"] == "TS-FT002") {
     String msg = (String("Depth cm. = ") + RFrtl_433_ESPdata["depth_cm"].as<String>());
     AddInfo(msg);
-    sendEspNow_Tank(RFrtl_433_ESPdata["depth_cm"], RFrtl_433_ESPdata["temperature_C"], RFrtl_433_ESPdata["rssi"]);
+    // sendEspNow_Tank(RFrtl_433_ESPdata["depth_cm"], RFrtl_433_ESPdata["temperature_C"], RFrtl_433_ESPdata["rssi"]);
   } else
     AddInfo(String("Model ") + RFrtl_433_ESPdata["model"].as<String>());
 
@@ -99,20 +104,25 @@ void initOLED() {
   display.setFont(ArialMT_Plain_10);
 }
 void showOLEDMessage(String line1, String line2, String line3) {
+  display.clear();
   display.drawString(0, 0, line1); //  adds to buffer
   display.drawString(0, 12, line2);
   display.drawString(0, 24, line3);
-  display.drawString(0, 36, "line4");
+  //   display.drawString(0, 36, "line4");
   display.display(); // displays content in buffer
 }
+
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
-
-  setupEspNow();
-
+  //   Serial.begin(115200);
+  Serial.begin(250000);
+  delay(500);
   initOLED();
-  showOLEDMessage(String("Cotech-513326"), String("rtl_433_ESP"), String("OOK_Receiver.cpp"));
+  showOLEDMessage(String("OOK_Receiver"), String(IOT_CONFIG_DEVICE_ID), String("Setup Azure ..."));
+
+  //   setupEspNow();
+  setup_azure();
+
+  showOLEDMessage(String("OOK_Receiver"), String("Init rtl_433 ..."), String(""));
 
 #ifndef LOG_LEVEL
   LOG_LEVEL_SILENT
@@ -125,6 +135,7 @@ void setup() {
   rf.enableReceiver();
   Log.notice(F("****** setup complete ******" CR));
   rf.getModuleStatus();
+  showOLEDMessage(String("OOK_Receiver"), String("rtl_433_ESP"), String("Setup done"));
 }
 
 unsigned long uptime() {
@@ -174,6 +185,7 @@ float step = stepMin;
 
 void loop() {
   rf.loop();
+  loop_azure();
 #if defined(setBitrate) || defined(setFreqDev) || defined(setRxBW)
   char stepPrint[8];
   if (uptime() > next) {
