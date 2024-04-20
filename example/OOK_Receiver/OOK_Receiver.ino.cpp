@@ -11,6 +11,8 @@
 #include <rtl_433_ESP.h>
 
 // #include "espNow.h"
+RTC_DATA_ATTR int modeAvg = 10;
+
 #include "Azure.h"
 // #include "wind.h"
 
@@ -34,6 +36,115 @@ int count = 0;
 static ulong lastmillisCotech;
 String wind_dir[9] = {"N ", "NE", "E ", "SE", "S ", "SW", "W ", "NW", "?"};
 String info;
+
+#pragma region Average to azure
+static ulong lastAverageSentAzure;
+static ulong lastAverage10;
+float wind_avg10[60];
+int wind_dir10[60];
+int wind_dir60[6];
+float wind_avg60[6];
+float wind_max60[6];
+int index10 = 0;
+int index60 = 0;
+
+float GetAvg10() {
+  if (index10 == 0) return 0;
+  float all = 0;
+  int i = 0;
+  for (i = 0; i < index10; i++) {
+    all += wind_avg10[i];
+  }
+  return all / i;
+}
+float GetDir10() {
+  if (index10 == 0) return 0;
+  float windAvgX;
+  float windAvgY;
+  int i = 0;
+  for (i = 0; i < index10; i++) {
+    float theta = wind_dir10[i] / 180.0 * PI;
+    windAvgX += cos(theta);
+    windAvgY += sin(theta);
+  }
+  // result is -180 to 180. change this to 0-360.
+  float theta = atan2(windAvgY, windAvgX) / PI * 180;
+  if (theta < 0) theta += 360;
+  return theta;
+}
+void SendAvgAzure10() {
+  Serial.println("SendAvgAzure10()");
+  telemetry_payload = "{ \"deviceId\":\"" + String(IOT_CONFIG_DEVICE_ID) +
+                      "\", \"w10dir\":" + String(wind_dir60[index60]) +
+                      ", \"w10avg\":" + String(wind_avg60[index60]) +
+                      ", \"w10max\":" + String(wind_max60[index60]) + "}";
+
+  delay(1000);
+  send_azure();
+
+  //   2024 / 4 / 20 11 : 37 : 11 [INFO] Sending telemetry :
+  //   2024 / 4 / 20 11 : 37 : 11 [INFO] { "deviceId" : "rtl433wind", "w10dir" : 360,", "w10avg": 0.00,", "w10max": 0.00 }
+}
+
+void SendAvgAzure() {
+  Serial.println("SendAvgAzure()");
+  telemetry_payload = "{ \"deviceId\": \"" + String(IOT_CONFIG_DEVICE_ID) +
+                      ", \"avg6\":" + String(wind_avg60[5]) +
+                      ", \"max6\":" + String(wind_max60[5]) +
+                      ", \"dir5\":" + String(wind_dir60[4]) +
+                      ", \"avg5\":" + String(wind_avg60[4]) +
+                      ", \"max5\":" + String(wind_max60[4]) +
+                      ", \"dir4\":" + String(wind_dir60[3]) +
+                      ", \"avg4\":" + String(wind_avg60[3]) +
+                      ", \"max4\":" + String(wind_max60[3]) +
+                      ", \"dir3\":" + String(wind_dir60[2]) +
+                      ", \"avg3\":" + String(wind_avg60[2]) +
+                      ", \"max3\":" + String(wind_max60[2]) +
+                      ", \"dir2\":" + String(wind_dir60[1]) +
+                      ", \"avg2\":" + String(wind_avg60[1]) +
+                      ", \"max2\":" + String(wind_max60[1]) +
+                      ", \"dir1\":" + String(wind_dir60[0]) +
+                      ", \"avg1\":" + String(wind_avg60[0]) +
+                      ", \"max1\":" + String(wind_max60[0]) + "}";
+  delay(1000);
+  send_azure();
+  //{ "deviceId": "rtl433wind, "avg6":6.99, "max6":10.90, "dir5":16, "avg5":7.81, "max5":13.50, "dir4":34, "avg4":7.15, "max4":12.50, "dir3":32, "avg3":6.90, "max3":11.20, "dir2":38, "avg2":7.81, "max2":12.90, "dir1":21, "avg1":7.93, "max1":12.90}
+}
+
+void AddWind(int dir, float avg, float peak) {
+  //   Serial.printf("%02x", buf[i]);
+  String msg = (String("AddWind: ") + dir + "deg " + avg + "m/s " + peak + "m/s");
+  Serial.println(msg);
+
+  wind_dir10[index10] = dir;
+  wind_avg10[index10] = avg;
+  if (peak > wind_max60[index60])
+    wind_max60[index60] = peak;
+  index10++;
+  if (lastAverage10 == 0) {
+    lastAverage10 = millis();
+    lastAverageSentAzure = millis();
+  }
+  if (millis() - lastAverage10 >= 600000) { // 10 min
+    wind_dir60[index60] = GetDir10();
+    wind_avg60[index60] = GetAvg10();
+    Serial.printf("Avg dir=%f Avg wind=%f", wind_dir60[index60], wind_avg60[index60]);
+    if (modeAvg == 10)
+      SendAvgAzure10();
+    lastAverage10 = millis();
+    index10 = 0;
+    if (++index60 >= 6) {
+      if (modeAvg == 60)
+        SendAvgAzure();
+      index60 = 0;
+      index10 = 0;
+      lastAverageSentAzure = millis();
+    }
+  }
+  //   else
+  // Serial.printf("Avg dir=%f Avg wind=%f index10=%d\n", GetDir10(), GetAvg10(), index10);
+}
+#pragma endregion
 
 void logJson(JsonObject& jsondata) {
 #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
@@ -84,6 +195,8 @@ void rtl_433_Callback(char* message) {
     index /= 45;
     String msg = (String("Wind: ") + wind_dir[index] + " " + RFrtl_433_ESPdata["wind_max_m_s"].as<String>() + " m/s  dt:" + String((int)(timeSinceLast / 1000.0)) + "s");
     AddInfo(msg);
+    if (modeAvg > 0)
+      AddWind(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"]);
     // AddIncoming(RFrtl_433_ESPdata["wind_dir_deg"], RFrtl_433_ESPdata["wind_avg_m_s"], RFrtl_433_ESPdata["wind_max_m_s"], RFrtl_433_ESPdata["rssi"]);
     lastmillisCotech = millis();
   } else if (RFrtl_433_ESPdata["model"] == "TS-FT002") {

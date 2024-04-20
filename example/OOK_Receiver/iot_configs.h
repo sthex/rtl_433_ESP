@@ -61,5 +61,5 @@
 #endif // IOT_CONFIG_USE_X509_CERT
 
 // Publish message not faster than every 10 seconds and at least once every hour
-#define FASTEST_TELEMETRY_FREQUENCY_MILLISECS 10000
+#define FASTEST_TELEMETRY_FREQUENCY_MILLISECS 1000
 #define SLOWEST_TELEMETRY_FREQUENCY_MILLISECS 360000

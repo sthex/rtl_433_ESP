@@ -184,6 +184,14 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
       }
       incoming_data[i] = '\0';
       Logger.Info("Data: " + String(incoming_data));
+      if (String(incoming_data) == String("HEI"))
+        Logger.Info("Hei tilbake til deg ;)");
+      else if (String(incoming_data) == String("AVG10"))
+        modeAvg = 10;
+      else if (String(incoming_data) == String("AVG60"))
+        modeAvg = 60;
+      else if (String(incoming_data) == String("AVG0"))
+        modeAvg = 0;
 
       break;
     case MQTT_EVENT_BEFORE_CONNECT:
@@ -303,7 +311,7 @@ static void send_azure() {
   }
 
   Logger.Info("Sending telemetry:");
-  //   Logger.Info(telemetry_payload);
+  Logger.Info(telemetry_payload);
 
   // The topic could be obtained just once during setup,
   // however if properties are used the topic need to be generated again to reflect the
@@ -332,7 +340,7 @@ static void send_azure() {
 
 void setup_azure() {
   establishConnection();
-//   max_next_telemetry_send_time_ms = millis() + SLOWEST_TELEMETRY_FREQUENCY_MILLISECS;
+  //   max_next_telemetry_send_time_ms = millis() + SLOWEST_TELEMETRY_FREQUENCY_MILLISECS;
 }
 
 void loop_azure() {
